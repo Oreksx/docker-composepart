@@ -1,0 +1,56 @@
+version: '3'
+
+volumes:
+  postgres:
+  static:
+  media:
+
+networks:
+  nginx_network:
+    driver: bridge
+
+services:
+  db:
+    image: oreks/docker-compose:postgres
+    env_file: .env
+
+    volumes:
+      - postgres:/var/lib/postgres/data
+      - ./db:/docker-entrypoint-initdb.d
+
+    ports:
+      - "5432:5432"
+    networks:
+      - nginx_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    image: oreks/docker-compose:backend
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - nginx_network
+    ports:
+      - "8000:8000"
+    volumes:
+      - static:/static
+      - media:/app/media
+  nginx:
+    image: oreks/docker-compose:app_compose-nginx
+    env_file: .env
+    ports:
+      - "9000:80"
+
+    volumes:
+      - static:/static
+    networks:
+      - nginx_network
+    depends_on:
+      - backend
+
